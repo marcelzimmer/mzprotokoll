@@ -457,7 +457,7 @@ Es kann immer nur ein Dialog gleichzeitig geöffnet sein (`dialog_rx` ist `Optio
 | `Strg+T`    | Theme wechseln                      |
 | `Strg+W`    | Beenden (mit Bestätigungsdialog)    |
 | `Strg+I`    | Über-Dialog öffnen                  |
-| `Strg+H`    | Website öffnen (xdg-open)           |
+| `Strg+H`    | Hilfe-Website öffnen (xdg-open)     |
 | `↑`/`↓`     | Cursor zwischen Notizfeldern bewegen |
 
 ---
