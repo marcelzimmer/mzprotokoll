@@ -1,0 +1,13 @@
+[package]
+name = "mzprotokoll"
+version = "1.0.0"
+edition = "2021"
+authors = ["Marcel Zimmer"]
+license = "MIT"
+
+[dependencies]
+eframe = "0.31"
+chrono = "0.4"
+rfd = "0.15"
+genpdf = "0.2"
+image = "0.25.9"

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=MZProtokoll
+Comment=MZProtokoll
+Exec=mzprotokoll
+Icon=mzprotokoll
+Type=Application
+Categories=Office;
+Terminal=false
