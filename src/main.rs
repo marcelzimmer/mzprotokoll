@@ -1,3 +1,4 @@
+#![cfg_attr(windows, windows_subsystem = "windows")]
 //! MZProtokoll - Meeting-Protokoll-Editor
 //!
 //! Linux App zum Erstellen und Exportieren von Meeting-Protokollen
@@ -16,6 +17,14 @@ use eframe::egui::{self, RichText};
 use genpdf::Element as _;
 use std::collections::HashMap;
 use std::sync::mpsc;
+
+/// Öffnet eine URL im Standard-Webbrowser (Windows und Linux).
+fn url_oeffnen(url: &str) {
+    #[cfg(windows)]
+    let _ = std::process::Command::new("cmd").args(["/c", "start", "", url]).spawn();
+    #[cfg(not(windows))]
+    let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+}
 
 /// Erstellt eine fette Schrift mit der angegebenen Größe (in Punkten).
 fn fette_schrift(groesse: f32) -> egui::FontId {
@@ -358,20 +367,28 @@ impl ProtokollApp {
     /// und setzt alle Felder auf Standardwerte.
     fn new(ctx: &egui::Context) -> Self {
         // Systemschriften laden: egui benötigt Regular und Bold als separate Font-Families.
-        // Probiert bekannte Linux-Schriftpfade der Reihe nach durch.
+        // Liest Schriften zur Laufzeit vom System – keine Schriften werden eingebettet.
         {
+            #[cfg(windows)]
+            let schrift_paare = [
+                ("C:\\Windows\\Fonts\\arial.ttf",    "C:\\Windows\\Fonts\\arialbd.ttf"),
+                ("C:\\Windows\\Fonts\\segoeui.ttf",  "C:\\Windows\\Fonts\\segoeuib.ttf"),
+                ("C:\\Windows\\Fonts\\calibri.ttf",  "C:\\Windows\\Fonts\\calibrib.ttf"),
+                ("C:\\Windows\\Fonts\\tahoma.ttf",   "C:\\Windows\\Fonts\\tahomabd.ttf"),
+            ];
+            #[cfg(not(windows))]
             let schrift_paare = [
                 // Arch, Fedora, openSUSE
                 ("/usr/share/fonts/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/liberation/LiberationSans-Bold.ttf"),
-                ("/usr/share/fonts/TTF/LiberationSans-Regular.ttf", "/usr/share/fonts/TTF/LiberationSans-Bold.ttf"),
-                ("/usr/share/fonts/noto/NotoSans-Regular.ttf", "/usr/share/fonts/noto/NotoSans-Bold.ttf"),
-                ("/usr/share/fonts/TTF/NotoSans-Regular.ttf", "/usr/share/fonts/TTF/NotoSans-Bold.ttf"),
+                ("/usr/share/fonts/TTF/LiberationSans-Regular.ttf",        "/usr/share/fonts/TTF/LiberationSans-Bold.ttf"),
+                ("/usr/share/fonts/noto/NotoSans-Regular.ttf",             "/usr/share/fonts/noto/NotoSans-Bold.ttf"),
+                ("/usr/share/fonts/TTF/NotoSans-Regular.ttf",              "/usr/share/fonts/TTF/NotoSans-Bold.ttf"),
                 // Debian, Ubuntu, Mint
                 ("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
-                ("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"),
-                // DejaVu als Fallback (auf fast allen Linux-Distributionen vorhanden)
-                ("/usr/share/fonts/TTF/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"),
-                ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+                ("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",             "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"),
+                // DejaVu als Fallback
+                ("/usr/share/fonts/TTF/DejaVuSans.ttf",                    "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"),
+                ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
             ];
             for (regulaer_pfad, fett_pfad) in schrift_paare {
                 if let (Ok(regulaer_daten), Ok(fett_daten)) = (std::fs::read(regulaer_pfad), std::fs::read(fett_pfad)) {
@@ -855,27 +872,40 @@ impl ProtokollApp {
     /// Probiert nacheinander Liberation Sans, Noto Sans und DejaVu Sans.
     /// Gibt `None` zurück, wenn keine Schrift gefunden wird.
     fn schrift_laden(&self) -> Option<genpdf::fonts::FontFamily<genpdf::fonts::FontData>> {
-        // 1. Schriftfamilien mit Standard-Benennung (Name-Regular.ttf, Name-Bold.ttf, ...)
-        let schrift_familien = [
-            // Arch, Fedora, openSUSE
-            ("/usr/share/fonts/liberation", "LiberationSans"),
-            ("/usr/share/fonts/noto", "NotoSans"),
-            ("/usr/share/fonts/TTF", "LiberationSans"),
-            ("/usr/share/fonts/TTF", "NotoSans"),
-            // Debian, Ubuntu, Mint
-            ("/usr/share/fonts/truetype/liberation", "LiberationSans"),
-            ("/usr/share/fonts/truetype/noto", "NotoSans"),
-        ];
-        for (pfad, familie) in schrift_familien {
-            if let Ok(schrift) = genpdf::fonts::from_files(pfad, familie, None) {
-                return Some(schrift);
+        // Liest Schriften zur Laufzeit vom System – keine Schriften werden eingebettet.
+
+        // 1. Linux: Schriftfamilien mit Standard-Benennung (Name-Regular.ttf, Name-Bold.ttf, ...)
+        #[cfg(not(windows))]
+        {
+            let schrift_familien = [
+                ("/usr/share/fonts/liberation",          "LiberationSans"),
+                ("/usr/share/fonts/noto",                "NotoSans"),
+                ("/usr/share/fonts/TTF",                 "LiberationSans"),
+                ("/usr/share/fonts/TTF",                 "NotoSans"),
+                ("/usr/share/fonts/truetype/liberation", "LiberationSans"),
+                ("/usr/share/fonts/truetype/noto",       "NotoSans"),
+            ];
+            for (pfad, familie) in schrift_familien {
+                if let Ok(schrift) = genpdf::fonts::from_files(pfad, familie, None) {
+                    return Some(schrift);
+                }
             }
         }
 
-        // 2. Fallback: Einzelne .ttf-Dateien (DejaVu Sans – auf fast allen Distros vorhanden)
+        // 2. Einzelne .ttf-Dateien (Windows-Systemschriften + Linux DejaVu als Fallback)
+        #[cfg(windows)]
         let einzel_schriften = [
-            ("/usr/share/fonts/TTF/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"),
-            ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+            ("C:\\Windows\\Fonts\\arial.ttf",   "C:\\Windows\\Fonts\\arialbd.ttf"),
+            ("C:\\Windows\\Fonts\\verdana.ttf", "C:\\Windows\\Fonts\\verdanab.ttf"),
+            ("C:\\Windows\\Fonts\\calibri.ttf", "C:\\Windows\\Fonts\\calibrib.ttf"),
+            ("C:\\Windows\\Fonts\\segoeui.ttf", "C:\\Windows\\Fonts\\segoeuib.ttf"),
+        ];
+        #[cfg(not(windows))]
+        let einzel_schriften = [
+            ("/usr/share/fonts/TTF/DejaVuSans.ttf",                    "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"),
+            ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+            ("/usr/share/fonts/TTF/DejaVuSans.ttf",                    "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"),
+            ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
         ];
         for (regular_path, bold_path) in einzel_schriften {
             if let Ok(regular_data) = std::fs::read(regular_path) {
@@ -1731,9 +1761,7 @@ impl eframe::App for ProtokollApp {
             self.theme = self.theme.next(self.has_omarchy);
         }
         if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::H)) {
-            let _ = std::process::Command::new("xdg-open")
-                .arg("https://www.marcelzimmer.de")
-                .spawn();
+            url_oeffnen("https://www.marcelzimmer.de");
         }
         if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::I)) {
             self.show_about_dialog = true;
@@ -1897,9 +1925,7 @@ impl eframe::App for ProtokollApp {
                                 "PDF erzeugen" => self.pdf_exportieren(),
                                 "Theme ändern" => self.theme = self.theme.next(self.has_omarchy),
                                 "Hilfe" => {
-                                    let _ = std::process::Command::new("xdg-open")
-                                        .arg("https://www.marcelzimmer.de")
-                                        .spawn();
+                                    url_oeffnen("https://www.marcelzimmer.de");
                                 }
                                 "Über" => self.show_about_dialog = true,
                                 _ => {}
@@ -2460,15 +2486,11 @@ impl eframe::App for ProtokollApp {
                         ui.add_space(20.0);
 
                         if ui.add(egui::Button::new("Report an Issue").min_size(egui::vec2(200.0, 32.0))).clicked() {
-                            let _ = std::process::Command::new("xdg-open")
-                                .arg("https://www.marcelzimmer.de")
-                                .spawn();
+                            url_oeffnen("https://www.marcelzimmer.de");
                         }
                         ui.add_space(4.0);
                         if ui.add(egui::Button::new("Follow on X").min_size(egui::vec2(200.0, 32.0))).clicked() {
-                            let _ = std::process::Command::new("xdg-open")
-                                .arg("https://www.x.com/marcelzimmer")
-                                .spawn();
+                            url_oeffnen("https://www.x.com/marcelzimmer");
                         }
 
                         ui.add_space(8.0);

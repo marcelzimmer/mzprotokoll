@@ -31,7 +31,7 @@
 
 ## Überblick
 
-MZProtokoll ist eine Linux App zum Erstellen und Exportieren von Meeting-Protokollen [Markdown & PDF]. Die Oberfläche wird mit **egui/eframe** (Rust-GUI-Framework)
+MZProtokoll ist eine Desktop-App für **Linux und Windows** zum Erstellen und Exportieren von Meeting-Protokollen [Markdown & PDF]. Die Oberfläche wird mit **egui/eframe** (Rust-GUI-Framework)
 gerendert; als Ausgabeformat stehen **Markdown** (maschinenlesbar, versionierbar) und **PDF**
 (druckfertig, mit Seitenzahlen und Linkverzeichnis) zur Verfügung.
 
@@ -59,7 +59,9 @@ mzprotokoll/
 ├── src/
 │   └── main.rs          – gesamte Anwendungslogik (Datenmodell, UI, Export)
 ├── assets/
-│   └── icon.png         – App-Icon (wird zur Compile-Zeit eingebettet)
+│   ├── icon.png         – App-Icon (Quelle)
+│   └── icon.ico         – App-Icon für Windows-Binary (aus icon.png erzeugt)
+├── build.rs             – bettet icon.ico unter Windows in die .exe ein
 ├── Cargo.toml           – Paketdefinition und Abhängigkeiten
 ├── Cargo.lock           – reproduzierbare Builds
 ├── install.sh           – Installations-Skript (Linux)
@@ -260,11 +262,15 @@ und die Cursor-Position, um im nächsten Frame die Navigation auswerten zu könn
 ## Schriftarten-Laden
 
 egui benötigt für die Anzeige von fettem Text eine separate Font-Family „Bold".
-Die Anwendung versucht beim Start Systemschriften in dieser Reihenfolge zu laden:
+Die Anwendung liest Systemschriften zur Laufzeit – es werden keine Schriften eingebettet.
 
-- Liberation Sans (Linux: Arch, Fedora, Debian, Ubuntu)
-- Noto Sans (Linux)
-- DejaVu Sans (Linux-Fallback)
+**Windows** (in dieser Reihenfolge):
+- Arial, Segoe UI, Calibri, Tahoma (`C:\Windows\Fonts\`)
+
+**Linux** (in dieser Reihenfolge):
+- Liberation Sans (Arch, Fedora, Debian, Ubuntu)
+- Noto Sans
+- DejaVu Sans (Fallback)
 
 Wird keine Schrift gefunden, verwendet egui seine eingebettete Fallback-Schrift
 (ohne fette Variante).
@@ -390,9 +396,14 @@ Da genpdf keine Hyperlinks unterstützt, werden `[Text](URL)`-Links durch
 
 ### Schriftarten für PDF
 
-Für den PDF-Export (`schrift_laden`) sucht die App nach Liberation Sans oder
-Noto Sans in Familien-Verzeichnissen (über `genpdf::fonts::from_files`). Als
-Fallback wird DejaVu Sans verwendet.
+Für den PDF-Export (`schrift_laden`) sucht die App nach Systemschriften –
+es werden keine Schriften eingebettet oder mitgeliefert.
+
+**Windows:** Arial, Verdana, Calibri, Segoe UI (`C:\Windows\Fonts\`)
+
+**Linux:** Liberation Sans, Noto Sans (über `genpdf::fonts::from_files`),
+Fallback: DejaVu Sans.
+
 Wird keine Schrift gefunden, erscheint ein Fehlerdialog mit Installationshinweis.
 
 ---
@@ -457,7 +468,7 @@ Es kann immer nur ein Dialog gleichzeitig geöffnet sein (`dialog_rx` ist `Optio
 | `Strg+T`    | Theme wechseln                      |
 | `Strg+W`    | Beenden (mit Bestätigungsdialog)    |
 | `Strg+I`    | Über-Dialog öffnen                  |
-| `Strg+H`    | Hilfe-Website öffnen (xdg-open)     |
+| `Strg+H`    | Hilfe-Website öffnen                |
 | `↑`/`↓`     | Cursor zwischen Notizfeldern bewegen |
 
 ---
@@ -498,21 +509,35 @@ und die entsprechenden `visuals`-Zuweisungen ergänzen.
 ### Voraussetzungen
 
 - Rust (stable, getestet mit Edition 2021)
-- Systemschrift: Liberation Sans oder Noto Sans (für PDF-Export)
-- Linux: libxkbcommon, libwayland-dev (für eframe/Wayland)
+- **Linux:** libxkbcommon, libwayland-dev (für eframe/Wayland), Systemschrift (Liberation Sans, Noto Sans oder DejaVu Sans) für PDF-Export
+- **Windows:** WinLibs (MinGW-w64) im PATH für den GNU-Toolchain-Build
 
 ### Debug-Build
 
+**Linux:**
 ```bash
 cargo build
 ./target/debug/mzprotokoll
 ```
 
+**Windows:**
+```bash
+cargo +stable-x86_64-pc-windows-gnu build
+target\debug\mzprotokoll.exe
+```
+
 ### Release-Build
 
+**Linux:**
 ```bash
 cargo build --release
 ./target/release/mzprotokoll
+```
+
+**Windows:**
+```bash
+cargo +stable-x86_64-pc-windows-gnu build --release
+target\release\mzprotokoll.exe
 ```
 
 ### Linux-Installation (Systemweit)
